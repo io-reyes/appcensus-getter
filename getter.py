@@ -10,7 +10,7 @@ import datetime
 import time
 
 from apkfetch import apkfetch
-import dbops
+from dbops import dbops
 
 # TODO: uncomment if using multiple proxies
 #os.environ['https_proxy'] = "52.91.167.250:8888"
