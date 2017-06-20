@@ -195,36 +195,28 @@ def get(apps_list, output_dir, db_update=False, include_paid=False, force=False,
     global _init_success
     assert _init_success, 'Getter not initialized, must run init() first'
 
-    # Get metadata for all listed apps, exclude the ones that raise exceptions
-    metadata = dict()
     for app in apps_list:
         try:
-            metadata[app] = _process_metadata(app)
+            # Get metadata for the app
+            metadata = _process_metadata(app)
+
+            # Only proceed if it's a free app or if the paid override is set
+            if(metadata['app_is_free'] or include_paid):
+                will_download = True
+
+                # If there's a DB update, only download if there's a newer version than what's in the DB
+                if(db_update):
+                    will_download = _db_update(app, metadata, update_duplicate=force)
+
+                if(will_download):
+                    _download_app(app, metadata['release_version_code'], metadata['app_icon'], metadata['app_is_free'], output_dir)
+
+            else:
+                logging.warning('App %s is not free, skipping' % app)
+                continue
 
         except Exception as e:
-            logging.error('Exception occurred while getting metadata for app %s, skipping, waiting %d seconds to cool down' % (app, wait_secs))
-            logging.error(traceback.format_exc())
-            time.sleep(wait_secs)
-            continue
-
-    # Disregard non-free apps
-    apps_set = metadata.keys()
-    if(not include_paid):
-        non_free = [app for app in apps_set if not metadata[app]['app_is_free']]
-        [apps_set.remove(app) for app in non_free]
-        logging.warning('Ignored %d non-free apps specified' % len(non_free))
-
-    # Put app metadata in DB, determine which apps have new versions that need to be downloaded
-    download_set = set([app for app in apps_set if _db_update(app, metadata[app], update_duplicate=force) is True]) if db_update else apps_set
-    download_set = apps_set if force else download_set
-
-    # Download apps in the download set
-    for app in download_set:
-        try:
-            meta = metadata[app]
-            _download_app(app, meta['release_version_code'], meta['app_icon'], meta['app_is_free'], output_dir)
-        except Exception as e:
-            logging.error('Exception occurred for app %s, skipping, waiting %d seconds to cool down' % (app, wait_secs))
+            logging.error('Exception occurred while processing app %s, skipping, waiting %d seconds to cool down' % (app, wait_secs))
             logging.error(traceback.format_exc())
             continue
 
