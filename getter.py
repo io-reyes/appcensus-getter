@@ -131,6 +131,7 @@ def _process_metadata(package_name):
                  'app_name': metadata['docV2']['title'], \
                  'app_icon': public['appIcon'], \
                  'app_is_free': public['free'], \
+                 'app_is_family': public['family'], \
                  'app_url': public['devSite'], \
                  'app_categories': public['categories'], \
                  'app_installs': public['installs'], \
@@ -165,8 +166,9 @@ def _db_update(package_name, metadata, update_duplicate=False):
         app_url = metadata['app_url']
         app_icon = metadata['app_icon']
         app_installs = metadata['app_installs']
+        app_is_family = metadata['app_is_family']
 
-        app_key = dbops.insert_app(company_key, package_name, app_name, product_url=app_url, icon_url=app_icon, install_count=app_installs)
+        app_key = dbops.insert_app(company_key, package_name, app_name, product_url=app_url, icon_url=app_icon, install_count=app_installs, is_family=app_is_family)
         logging.info('Updated apps table id=%d (%s) for version code %d' % (app_key, package_name, version_code))
 
         # Update the appReleases table
