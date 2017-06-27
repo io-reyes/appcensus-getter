@@ -23,12 +23,16 @@ def _parse_args():
     parser.add_argument('credentials', help='Path to a credentials file containing Google and \
                                              database credentials. See getter.secrets.example for format')
     parser.add_argument('--db-update', '-d', action='store_true', help='Will update database if supplied')
-    parser.add_argument('--force', action='store_true', help='Will force download and database updates and overwrites if supplied')
-    parser.add_argument('--apps-file', '-f', help='Path to a file containing app package names, one per line.')
+    parser.add_argument('--force', action='store_true', help='Force download and database updates, even if the app version is the same')
     parser.add_argument('--apps', '-a', help='Comma-separated list of app package names')
+    parser.add_argument('--apps-file', '-f', help='Path to a file containing app package names, one per line.')
+    parser.add_argument('--apps-update', '-u', action='store_true', help='Check for udpates for apps that haven\'t been checked in 2 weeks, implies --db-update')
+    parser.add_argument('--apps-update-limit', type=int, default=100, help='Maximum number of apps to check for updates if --apps-update is provided')
     parser.add_argument('--output', '-o', help='Path to an output directory. Files will be stored \
                                                 in OUTPUT/<package>/<version-code>/. Defaults to \
                                                 the current working directory.', default=os.getcwd())
+    parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
+    parser.add_argument('--test', action='store_true', help='Do all input parsing, checks, and authentications, but omit app downloading step')
 
     return parser.parse_args()
 
@@ -69,6 +73,11 @@ def _read_apps_file(apps_file=None):
 def _parse_apps_list(apps_list=None):
     if(apps_list is not None):
         return [app.strip() for app in apps_list.split(',')]
+    return []
+
+def _retrieve_app_updates(to_retrieve, limit=100):
+    if(to_retrieve):
+        return dbops.get_apps_to_update(limit=limit)
     return []
 
 def _init_google(google_cred):
@@ -241,31 +250,41 @@ def _get_icon_url(apps_list):
     assert False, 'This is a test function'
 
 if __name__ == '__main__':
-    logging.basicConfig(level=20)
-
+    # Get inputs and set appropriate logging level
     args = _parse_args()
+    if(args.verbose):
+        logging.basicConfig(level=logging.INFO)
     (google_creds, db_cred) = _parse_config(args.credentials)
-    apps = _read_apps_file(args.apps_file) + _parse_apps_list(args.apps)
-    db_update = args.db_update
-    output_dir = args.output
-    force = args.force
 
-    assert len(apps) > 0, 'No apps supplied, need to use the --apps-file and/or the --apps flags'
-    assert os.path.isdir(output_dir), 'Target output directory %s does not exist' % output_dir
-
-    logging.info('%d apps to get, start=%s, end=%s' % (len(apps), apps[0], apps[-1]))
-    logging.info('DB update=%s' % db_update)
-    logging.info('Output dir=%s' % output_dir)
-
+    # Pick a random Google credential
     google_cred_count = len(google_creds)
     random_cred_idx = random.randint(0, google_cred_count - 1)
     google_cred = google_creds[random_cred_idx]
     logging.info('Randomly selected Google credentials for %s' % google_cred['email'])
 
+    # If --apps-update is supplied, --db-update is implied
+    db_update = args.apps_update or args.db_update
+
+    # Log in to DB and (if necessary) Google
     if(db_update):
         assert db_cred is not None, 'Database update specified, but no credentials supplied'
         init(google_cred, db_cred=db_cred)
     else:
         init(google_cred)
 
-    get(apps, output_dir, db_update=db_update, force=force)
+    # Build the list of apps to get
+    apps = _read_apps_file(args.apps_file) + _parse_apps_list(args.apps) + _retrieve_app_updates(args.apps_update, limit=args.apps_update_limit)
+
+    # Pre-get checks
+    assert len(apps) > 0, 'No apps supplied, please use the --apps, --apps-file, and apps-update flags'
+    assert os.path.isdir(args.output), 'Target output directory %s does not exist' % output 
+
+    # Output the run parameters
+    logging.info('App count: %d' % len(apps))
+    logging.info('App list: %s' % str(apps))
+    logging.info('Output path: %s' % args.output)
+    logging.info('DB update: %s' % db_update)
+    logging.info('Force download: %s' % args.force)
+
+    if(not args.test):
+        get(apps, args.output, db_update=db_update, force=args.force)
