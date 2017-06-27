@@ -23,14 +23,15 @@ def _parse_args():
     parser.add_argument('credentials', help='Path to a credentials file containing Google and \
                                              database credentials. See getter.secrets.example for format')
     parser.add_argument('--db-update', '-d', action='store_true', help='Will update database if supplied')
-    parser.add_argument('--force', action='store_true', help='Force download and database updates, even if the app version is the same')
+    parser.add_argument('--force', '-F', action='store_true', help='Force download and database updates, even if the app version is the same')
     parser.add_argument('--apps', '-a', help='Comma-separated list of app package names')
     parser.add_argument('--apps-file', '-f', help='Path to a file containing app package names, one per line.')
     parser.add_argument('--apps-update', '-u', action='store_true', help='Check for udpates for apps that haven\'t been checked in 2 weeks, implies --db-update')
-    parser.add_argument('--apps-update-limit', type=int, default=100, help='Maximum number of apps to check for updates if --apps-update is provided')
+    parser.add_argument('--apps-update-limit', '-l', type=int, default=100, help='Maximum number of apps to check for updates if --apps-update is provided')
     parser.add_argument('--output', '-o', help='Path to an output directory. Files will be stored \
                                                 in OUTPUT/<package>/<version-code>/. Defaults to \
                                                 the current working directory.', default=os.getcwd())
+    parser.add_argument('--ignore-existing', '-i', action='store_true', help='Ignore app package names that are already in the database, implies --db-update')
     parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
     parser.add_argument('--test', action='store_true', help='Do all input parsing, checks, and authentications, but omit app downloading step')
 
@@ -272,6 +273,10 @@ def _get_icon_url(apps_list):
 
     assert False, 'This is a test function'
 
+def _new_apps_only(apps_list):
+    logging.info('Eliminating packages that are already in the database')
+    return [x for x in apps_list if dbops.get_app_id(x) is None]
+
 if __name__ == '__main__':
     # Get inputs and set appropriate logging level
     args = _parse_args()
@@ -279,14 +284,17 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.INFO)
     (google_creds, db_cred) = _parse_config(args.credentials)
 
+    # Ensure that --apps-update and --ignore-existing are not both turned on
+    assert not (args.apps_update and args.ignore_existing), '--apps-update and --ignore-existing cannot both be present'
+
     # Pick a random Google credential
     google_cred_count = len(google_creds)
     random_cred_idx = random.randint(0, google_cred_count - 1)
     google_cred = google_creds[random_cred_idx]
     logging.info('Randomly selected Google credentials for %s' % google_cred['email'])
 
-    # If --apps-update is supplied, --db-update is implied
-    db_update = args.apps_update or args.db_update
+    # If either --apps-update or --ignore-existing is supplied, --db-update is implied
+    db_update = (args.apps_update or args.ignore_existing) or args.db_update
 
     # Log in to DB and (if necessary) Google
     if(db_update):
@@ -296,7 +304,9 @@ if __name__ == '__main__':
         init(google_cred)
 
     # Build the list of apps to get
-    apps = _read_apps_file(args.apps_file) + _parse_apps_list(args.apps) + _retrieve_app_updates(args.apps_update, limit=args.apps_update_limit)
+    apps = set(_read_apps_file(args.apps_file) + _parse_apps_list(args.apps) + _retrieve_app_updates(args.apps_update, limit=args.apps_update_limit))
+    if(args.ignore_existing):
+        apps = _new_apps_only(apps)
 
     # Pre-get checks
     assert len(apps) > 0, 'No apps supplied, please use the --apps, --apps-file, and apps-update flags'
