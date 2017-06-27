@@ -202,12 +202,28 @@ def _db_update(package_name, metadata, update_duplicate=False):
 
     return to_update
 
-def get(apps_list, output_dir, db_update=False, include_paid=False, force=False, wait_secs=5):
+def _cooldown(min_seconds=10, max_seconds=20):
+    assert min_seconds <= max_seconds, 'min_seconds %d must be <= max_seconds %d' % (min_seconds, max_seconds)
+    assert min_seconds >= 0 and max_seconds >= 0, 'min_seconds %d and max_seconds %d must both be non-negative' % (min_seconds, max_seconds)
+
+    cooldown_time = random.randint(min_seconds, max_seconds)
+    logging.info('Starting cooldown %d seconds' % cooldown_time)
+    time.sleep(cooldown_time)
+    logging.info('Ending cooldown')
+
+def get(apps_list, output_dir, db_update=False, include_paid=False, force=False, cooldown_every=100):
     global _init_success
     assert _init_success, 'Getter not initialized, must run init() first'
 
+    failed_apps = list()
+    app_counter = 0
     for app in apps_list:
         try:
+            # Check for cooldown
+            app_counter = app_counter + 1
+            if(app_counter % cooldown_every == 0):
+                _cooldown()
+
             # Get metadata for the app
             metadata = _process_metadata(app)
 
@@ -227,9 +243,16 @@ def get(apps_list, output_dir, db_update=False, include_paid=False, force=False,
                 continue
 
         except Exception as e:
-            logging.error('Exception occurred while processing app %s, skipping, waiting %d seconds to cool down' % (app, wait_secs))
+            logging.error('Exception occurred while processing app %s, skipping and cooling down' % app)
             logging.error(traceback.format_exc())
+            _cooldown(min_seconds=3, max_seconds=7)
+            
+            failed_apps.append(app)
+
             continue
+
+    for app in failed_apps:
+        logging.warning('Failed getting package: %s' % app)
 
 def _get_icon_url(apps_list):
     logging.warning('_get_icon_url() is for testing purposes only')
