@@ -9,6 +9,7 @@ import traceback
 import datetime
 import time
 
+from requests import HTTPError
 from apkfetch import apkfetch
 from dbops import dbops
 
@@ -203,6 +204,9 @@ def _db_update(package_name, metadata, update_duplicate=False):
 
     return to_update
 
+def _db_mark_not_in_store(package_name):
+    dbops.update_app_in_store(package_name, in_store=False)
+
 def _cooldown(min_seconds=10, max_seconds=20):
     assert min_seconds <= max_seconds, 'min_seconds %d must be <= max_seconds %d' % (min_seconds, max_seconds)
     assert min_seconds >= 0 and max_seconds >= 0, 'min_seconds %d and max_seconds %d must both be non-negative' % (min_seconds, max_seconds)
@@ -242,6 +246,16 @@ def get(apps_list, output_dir, db_update=False, include_paid=False, force=False,
             else:
                 logging.warning('App %s is not free, skipping' % app)
                 continue
+        except HTTPError as e:
+            logging.error('HTTPError occurred while processing app %s, skipping, marking as unavailable, and cooling down' % app)
+            logging.error(traceback.format_exc())
+            _cooldown(min_seconds=3, max_seconds=7)
+
+            failed_apps.append(app)
+            if(db_update):
+                _db_mark_not_in_store(app)
+
+            continue
 
         except Exception as e:
             logging.error('Exception occurred while processing app %s, skipping and cooling down' % app)
