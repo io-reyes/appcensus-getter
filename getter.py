@@ -8,6 +8,7 @@ import urllib
 import traceback
 import datetime
 import time
+import requests
 
 from requests import HTTPError
 from apkfetch import apkfetch
@@ -139,6 +140,7 @@ def _process_metadata(package_name):
                  'company_url': details['developerWebsite'], \
                  'company_email': details['developerEmail'], \
                  'company_gdid': public['devId'], \
+                 'policy_url': public['devPrivacy'], \
                  'app_name': metadata['docV2']['title'], \
                  'app_icon': public['appIcon'], \
                  'app_is_free': public['free'], \
@@ -153,6 +155,10 @@ def _process_metadata(package_name):
                  'release_has_iap': public['iap']}
 
     return processed
+
+def _is_url_active(url):
+    resp = requests.get(url)
+    return resp.status_code == 200
 
 def _db_update(package_name, metadata, update_duplicate=False):
     version_code = metadata['release_version_code']
@@ -172,6 +178,13 @@ def _db_update(package_name, metadata, update_duplicate=False):
         company_key = dbops.insert_company(company_name, google_dev_id=company_gdid)
         logging.info('Updated companies table id=%d (%s)' % (company_key, company_name))
 
+        # Update the privacyPolicies table
+        policy_url = metadata['policy_url']
+        policy_key = None
+        if(policy_url is not None):
+            link_active = _is_url_active(policy_url)
+            policy_key = dbops.insert_policy(policy_url, link_active)
+
         # Update the apps table
         app_name = metadata['app_name']
         app_url = metadata['app_url']
@@ -179,7 +192,7 @@ def _db_update(package_name, metadata, update_duplicate=False):
         app_installs = metadata['app_installs']
         app_is_family = metadata['app_is_family']
 
-        app_key = dbops.insert_app(company_key, package_name, app_name, product_url=app_url, icon_url=app_icon, install_count=app_installs, is_family=app_is_family)
+        app_key = dbops.insert_app(company_key, package_name, app_name, product_url=app_url, icon_url=app_icon, install_count=app_installs, is_family=app_is_family, policy_key=policy_key)
         logging.info('Updated apps table id=%d (%s) for version code %d' % (app_key, package_name, version_code))
 
         # Update the appReleases table
