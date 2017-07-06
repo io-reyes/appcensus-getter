@@ -156,9 +156,16 @@ def _process_metadata(package_name):
 
     return processed
 
-def _is_url_active(url):
-    resp = requests.get(url)
-    return resp.status_code == 200
+def _is_url_active(url, timeout=5):
+    try:
+        resp = requests.get(url, timeout=timeout)
+        return resp.status_code == 200
+
+    except Exception as e:
+        logging.error('Exception on URL check for %s' % url)
+        logging.exception(e)
+
+        return False
 
 def _db_update(package_name, metadata, update_duplicate=False):
     version_code = metadata['release_version_code']
