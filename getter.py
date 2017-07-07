@@ -13,11 +13,7 @@ import requests
 from requests import HTTPError
 from apkfetch import apkfetch
 from dbops import dbops
-
-# TODO: uncomment if using multiple proxies
-#os.environ['https_proxy'] = "52.91.167.250:8888"
-#os.environ['http_proxy'] = "52.91.167.250:8888"
-#os.environ['no_proxy'] = '127.0.0.1,localhost'
+from urlchecker import urlchecker
 
 def _parse_args():
     parser = argparse.ArgumentParser(description='Download apps, optionally update appcensus DB')
@@ -156,17 +152,6 @@ def _process_metadata(package_name):
 
     return processed
 
-def _is_url_active(url, timeout=5):
-    try:
-        resp = requests.get(url, timeout=timeout)
-        return resp.status_code == 200
-
-    except Exception as e:
-        logging.error('Exception on URL check for %s' % url)
-        logging.exception(e)
-
-        return False
-
 def _db_update(package_name, metadata, update_duplicate=False):
     version_code = metadata['release_version_code']
 
@@ -189,7 +174,7 @@ def _db_update(package_name, metadata, update_duplicate=False):
         policy_url = metadata['policy_url']
         policy_key = None
         if(policy_url is not None):
-            link_active = _is_url_active(policy_url)
+            link_active = urlchecker.check_url(policy_url)
             policy_key = dbops.insert_policy(policy_url, link_active)
 
         # Update the apps table

@@ -1,2 +1,3 @@
 -e git+https://github.com/io-reyes/appcensus-apkfetch.git#egg=apkfetch
 -e git+https://github.com/io-reyes/appcensus-dbops.git#egg=dbops
+-e git+https://github.com/io-reyes/appcensus-urlchecker.git#egg=urlchecker
