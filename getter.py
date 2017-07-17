@@ -31,7 +31,7 @@ def _parse_args():
                                                 the current working directory.', default=os.getcwd())
     parser.add_argument('--ignore-existing', '-i', action='store_true', help='Ignore app package names that are already in the database, implies --db-update')
     parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
-    parser.add_argument('--test', action='store_true', help='Do all input parsing, checks, and authentications, but omit app downloading step')
+    parser.add_argument('--test', action='store_true', help='Do all input parsing, checks, and authentications, but omit app downloading step, implies verbose')
 
     return parser.parse_args()
 
@@ -48,7 +48,8 @@ def _parse_config(config_file):
     for header in google_headers:
         cred = {'email':config.get(header, 'email'), \
                 'password':config.get(header, 'password'), \
-                'gsfid':config.get(header, 'gsfid')}
+                'gsfid':config.get(header, 'gsfid'), \
+                'token':config.get(header, 'token')}
         google_creds.append(cred)
         logging.info('Found Google credentials for %s' % cred['email'])
 
@@ -80,7 +81,7 @@ def _retrieve_app_updates(to_retrieve, limit=100):
     return []
 
 def _init_google(google_cred):
-    apkfetch.init_api(google_cred['email'], google_cred['password'], google_cred['gsfid'])
+    apkfetch.init_api(google_cred['email'], google_cred['password'], google_cred['gsfid'], auth_sub_token=google_cred['token'])
     logging.info('Logged in to Google as %s' % google_cred['email'])
 
 def _init_db(db_cred):
@@ -299,7 +300,7 @@ def _new_apps_only(apps_list):
 if __name__ == '__main__':
     # Get inputs and set appropriate logging level
     args = _parse_args()
-    if(args.verbose):
+    if(args.verbose or args.test):
         logging.basicConfig(level=logging.INFO)
     (google_creds, db_cred) = _parse_config(args.credentials)
 
