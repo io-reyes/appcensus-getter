@@ -241,13 +241,18 @@ def get(apps_list, output_dir, db_update=False, include_paid=False, force=False,
             # Only proceed if it's a free app or if the paid override is set
             if(metadata['app_is_free'] or include_paid):
                 will_download = True
+                version_code = metadata['release_version_code']
 
-                # If there's a DB update, only download if there's a newer version than what's in the DB
+                # If there's a DB update, only download if there's a newer version than what's in the DB or if the APK doesn't already exist
                 if(db_update):
-                    will_download = _db_update(app, metadata, update_duplicate=force)
+                    expected_apk = os.path.join(output_dir, \
+                                                app, \
+                                                version_code, \
+                                                '%s-%d.apk' % (app, version_code))
+                    will_download = _db_update(app, metadata, update_duplicate=force) or not os.path.isfile(expected_apk)
 
                 if(will_download):
-                    _download_app(app, metadata['release_version_code'], metadata['app_icon'], metadata['app_is_free'], output_dir)
+                    _download_app(app, version_code, metadata['app_icon'], metadata['app_is_free'], output_dir)
 
             else:
                 logging.warning('App %s is not free, skipping' % app)
