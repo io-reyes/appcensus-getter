@@ -247,7 +247,7 @@ def get(apps_list, output_dir, db_update=False, include_paid=False, force=False,
                 if(db_update):
                     expected_apk = os.path.join(output_dir, \
                                                 app, \
-                                                version_code, \
+                                                str(version_code), \
                                                 '%s-%d.apk' % (app, version_code))
                     will_download = _db_update(app, metadata, update_duplicate=force) or not os.path.isfile(expected_apk)
 
