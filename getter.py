@@ -243,13 +243,14 @@ def get(apps_list, output_dir, db_update=False, include_paid=False, force=False,
                 will_download = True
                 version_code = metadata['release_version_code']
 
-                # If there's a DB update, only download if there's a newer version than what's in the DB or if the APK doesn't already exist
+                # If there's a DB update, only download if there's a newer version than what's in the DB
                 if(db_update):
-                    expected_apk = os.path.join(output_dir, \
-                                                app, \
-                                                str(version_code), \
-                                                '%s-%d.apk' % (app, version_code))
-                    will_download = _db_update(app, metadata, update_duplicate=force) or not os.path.isfile(expected_apk)
+                    #expected_apk = os.path.join(output_dir, \
+                    #                            app, \
+                    #                            str(version_code), \
+                    #                            '%s-%d.apk' % (app, version_code))
+                    #will_download = _db_update(app, metadata, update_duplicate=force) or not os.path.isfile(expected_apk)
+                    will_download = _db_update(app, metadata, update_duplicate=force)
 
                 if(will_download):
                     _download_app(app, version_code, metadata['app_icon'], metadata['app_is_free'], output_dir)
